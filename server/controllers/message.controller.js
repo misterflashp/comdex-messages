@@ -3,7 +3,8 @@ let messageDbo = require('../dbos/message.dbo');
 let logsDbo = require('../dbos/logs.dbo');
 let jwt = require('../helpers/JWT');
 let lodash = require('lodash');
-var file = '/tmp/data.xml';
+var xmlFile = '/tmp/data.xml';
+var jsonFile = '/tmp/data.json';
 let fs = require('fs');
 /**
  * @api {post/put} /message To update or add message.
@@ -34,7 +35,8 @@ let updateMessage = (req, res) => {
     appCode
   } = req.body;
   let updatedOn = Date.now();
-  let oldMessage = {};
+  let oldValue = {};
+  let user;
   async.waterfall([
     (next) => {
       jwt.verifyJWT(token, (error, data) => {
@@ -43,11 +45,12 @@ let updateMessage = (req, res) => {
           message: "Token expired"
         }, null);
         else {
-          next(null, data);
+          user = data.username;
+          next(null);
         }
       });
-    }, (data, next) => {
-      messageDbo.getOneMessage({
+    }, (next) => {
+      messageDbo.getMessages({
         name,
         appCode
       }, (error, message) => {
@@ -57,8 +60,8 @@ let updateMessage = (req, res) => {
             message: 'Error while getting message'
           }, null);
         } else if (message && message.length) {
-          oldMessage = message[0]['message'];
-          next(null, data);
+          oldValue = message[0]['message'];
+          next(null);
         } else {
           next({
             status: 400,
@@ -66,13 +69,29 @@ let updateMessage = (req, res) => {
           }, null);
         }
       })
-    }, (data, next) => {
+    }, (next) => {
+      messageDbo.updateMessage({
+          message,
+          appCode,
+          name,
+          updatedOn
+        },
+        (error, result) => {
+          if (error) {
+            next({
+              status: 500,
+              message: 'Error while updating message'
+            }, null);
+          } else next(null);
+        });
+    }, (next) => {
       let logObj = {
-        user: data.name,
+        user: user,
         appCode: appCode,
-        messageName: name,
-        oldMessage: oldMessage,
-        newMessage: message,
+        logType: "message",
+        name: name,
+        oldValue: oldValue,
+        newValue: message,
         updatedOn: updatedOn
       }
       logsDbo.logRequest(logObj, (error, response) => {
@@ -82,28 +101,12 @@ let updateMessage = (req, res) => {
             message: "Error while logging"
           }, null);
         } else {
-          next(null);
+          next(null, {
+            status: 200,
+            message: "Message updated successfully"
+          });
         }
       });
-    },
-    (next) => {
-      messageDbo.updateMessage({
-          message,
-          appCode,
-          name,
-          updatedOn
-        },
-        (error, response) => {
-          if (error) {
-            next({
-              status: 500,
-              message: 'Error while updating message'
-            }, null);
-          } else next(null, {
-            status: 200,
-            message: 'Updated successfully'
-          });
-        });
     }
   ], (error, result) => {
     let response = Object.assign({
@@ -230,10 +233,23 @@ let getMessage = (req, res) => {
     sortBy,
     order
   } = req.query;
+  let {
+    token
+  } = req.headers;
   sortBy = (sortBy) ? ((sortBy === "name") ? sortBy : "message." + sortBy) : "name";
   let ord = (order) ? ((order === 'desc') ? -1 : 1) : 1;
   async.waterfall([
     (next) => {
+      jwt.verifyJWT(token, (error, data) => {
+        if (error) next({
+          status: 400,
+          message: "Token expired"
+        }, null);
+        else {
+          next(null);
+        }
+      });
+    }, (next) => {
       messageDbo.getMessage({
         appCode,
         sortBy,
@@ -264,8 +280,21 @@ let searchMessage = (req, res) => {
     searchKey,
     appCode
   } = req.query;
+  let {
+    token
+  } = req.headers;
   async.waterfall([
     (next) => {
+      jwt.verifyJWT(token, (error, data) => {
+        if (error) next({
+          status: 400,
+          message: "Token expired"
+        }, null);
+        else {
+          next(null);
+        }
+      });
+    }, (next) => {
       messageDbo.searchMessage({
           searchKey,
           appCode
@@ -290,98 +319,31 @@ let searchMessage = (req, res) => {
     res.status(status).send(response);
   });
 }
-/*
-let getMessageFile = (req, res) => {
-  let { appCode, languages } = req.query;
- // let isActive = true;
-  // let language = languages[0];
-  //console.log(languages);
-  let availableLang = [];
-  let notAvailableLang = [];
-  fs.writeFile(file, '');
-  async.waterfall([
-    (next) => {
-      appMessageDbo.getOneMessage({ appCode}, (error, result) => {
-        if (error) {
-          next({
-            status: 500,
-            message: 'Error while fetching message'
-          }, null);
-        } else if (result && result.length) {
-          let msg = result[0].message;
-          let resource = `<resources>\n`;
-          fs.appendFileSync(file, resource);
-          lodash.forEach(languages, (language) => {
-            if (msg.hasOwnProperty(language)) {
-              resource = `<lang  name = \"${language}\"> \n`;
-              fs.appendFileSync(file, resource);
-              lodash.forEach(result, (obj) => {
-                let string = "\t<string name = \"" + obj.name + "\"> " + obj.message[language] + "</string>\n";
-                fs.appendFileSync(file, string);
-              });
-              let resourceend = "</lang>\n";
-              fs.appendFileSync(file, resourceend);
-              availableLang.push(language);
-            } else {
-              notAvailableLang.push(language);
-            }
-          });
-          let resourceend = "</resources>";
-          fs.appendFileSync(file, resourceend);
-          next(null);
-        } else {
-          next({
-            status: 400,
-            message: ' No records found'
-          }, null);
-        }
-      });
-    },(next)=>{
-      if(availableLang.length == languages.length){
-        next(null,{
-          status:200,
-          message:'All languages available'
-        });
-      }else if(notAvailableLang.length == languages.length){
-        next({
-          status: 400,
-          message: 'No language transalation available'
-        });
-      }else{
-        next(null,{
-          status:300,
-          message: 'Some language transalation available'
-        });
-      }
-    }], (error, result) => {
-      let response = Object.assign({
-        success: !error
-      }, error || result);
-      let status = response.status;
-      delete (response.status);
-      if (status == 200) {
-        res.status(status).download(file, `${appCode}_All_Languages_Messages.xml`);
-      }else if (status == 300) {
-        res.status(200).download(file, `${appCode}_Some_Languages_Messages.xml`);
-      } else {
-        res.status(status).send(response);
-      }
-    });
-}
-*/
 
 let getMessageFileDown = (req, res) => {
   let {
     appCode,
-    languages
+    languages,
+    format
   } = req.query;
-  // let language = languages[0];
-  //  console.log(languages);
   let availableLang = [];
   let notAvailableLang = [];
-  fs.writeFile(file, '');
+  if (!format) format = "xml";
+  let {
+    token
+  } = req.headers;
   async.waterfall([
     (next) => {
+      jwt.verifyJWT(token, (error, data) => {
+        if (error) next({
+          status: 400,
+          message: "Token expired"
+        }, null);
+        else {
+          next(null);
+        }
+      });
+    }, (next) => {
       messageDbo.getMessages({
         appCode
       }, (error, result) => {
@@ -391,34 +353,39 @@ let getMessageFileDown = (req, res) => {
             message: 'Error while fetching message'
           }, null);
         } else if (result && result.length) {
-          let allLang = []
-          lodash.forEach(result, (res) => {
-            let lang = Object.keys(res.message);
-            allLang = allLang.concat(lang);
-          });
-          allLang = lodash.uniq(allLang);
+          if (format && format == "xml") {
+            let allLang = []
+            lodash.forEach(result, (res) => {
+              let lang = Object.keys(res.message);
+              allLang = allLang.concat(lang);
+            });
+            allLang = lodash.uniq(allLang);
 
-          let msg = result[0].message;
-          let resource = `<resources>\n`;
-          fs.appendFileSync(file, resource);
-          lodash.forEach(languages, (language) => {
-            if (allLang.indexOf(language) > -1) {
-              resource = `<lang  name = \"${language}\"> \n`;
-              fs.appendFileSync(file, resource);
-              lodash.forEach(result, (obj) => {
-                let string = "\t<string name = \"" + obj.name + "\"> " + obj.message[language] + "</string>\n";
-                if (obj.message[language]) fs.appendFileSync(file, string);
-              });
-              let resourceend = "</lang>\n";
-              fs.appendFileSync(file, resourceend);
-              availableLang.push(language);
-            } else {
-              notAvailableLang.push(language);
-            }
-          });
-          let resourceend = "</resources>";
-          fs.appendFileSync(file, resourceend);
-          next(null);
+            let msg = result[0].message;
+            fs.writeFile(xmlFile, '');
+            let resource = `<resources>\n`;
+            fs.appendFileSync(xmlFile, resource);
+            lodash.forEach(languages, (language) => {
+              if (allLang.indexOf(language) > -1) {
+                resource = `<lang  name = \"${language}\"> \n`;
+                fs.appendFileSync(xmlFile, resource);
+                lodash.forEach(result, (obj) => {
+                  let string = "\t<string name = \"" + obj.name + "\"> " + obj.message[language] + "</string>\n";
+                  if (obj.message[language]) fs.appendFileSync(xmlFile, string);
+                });
+                let resourceend = "</lang>\n";
+                fs.appendFileSync(xmlFile, resourceend);
+                availableLang.push(language);
+              } else {
+                notAvailableLang.push(language);
+              }
+            });
+            let resourceend = "</resources>";
+            fs.appendFileSync(xmlFile, resourceend);
+          } else {
+            next(null, result);
+          }
+
         } else {
           next({
             status: 400,
@@ -426,20 +393,48 @@ let getMessageFileDown = (req, res) => {
           }, null);
         }
       });
+    }, (result, next) => {
+      if (format && format == "json") {
+        fs.writeFileSync(jsonFile, '');
+        let finalObj = {};
+        lodash.forEach(languages, (language) => {
+          let obj = {};
+          lodash.forEach(result, (message) => {
+            let msg = message.message;
+            if (msg[language]) obj[message.name] = msg[language];
+          });
+          if ((Object.keys(obj)).length) {
+            finalObj[language] = obj;
+            availableLang.push(language);
+          } else {
+            notAvailableLang.push(language);
+          }
+        });
+        fs.writeFileSync(jsonFile, JSON.stringify(finalObj), 'utf-8');
+        next(null);
+      } else {
+        next({
+          status: 400,
+          message: "Required format not available"
+        }, null);
+      }
     }, (next) => {
       if (availableLang.length == languages.length) {
         next(null, {
           status: 200,
+          format: format,
           message: 'All languages available'
         });
       } else if (notAvailableLang.length == languages.length) {
         next({
           status: 400,
+          format: format,
           message: 'No language transalation available'
         });
       } else {
         next(null, {
           status: 300,
+          format: format,
           message: 'Some language transalation available'
         });
       }
@@ -450,10 +445,15 @@ let getMessageFileDown = (req, res) => {
     }, error || result);
     let status = response.status;
     delete(response.status);
+    let format = response.format;
+    let file;
+    if (format == "json") file = jsonFile;
+    if (format == "xml") file = xmlFile;
+    delete response.format;
     if (status == 200) {
-      res.status(status).download(file, `${appCode}_All_Languages_Messages.xml`);
+      res.status(status).download(file, `${appCode}_All_Languages_Messages.${format}`);
     } else if (status == 300) {
-      res.status(200).download(file, `${appCode}_Some_Languages_Messages.xml`);
+      res.status(200).download(file, `${appCode}_Some_Languages_Messages.${format}`);
     } else {
       res.status(status).send(response);
     }
@@ -464,7 +464,6 @@ module.exports = {
   getMessage,
   updateMessage,
   searchMessage,
-  // getMessageFile,
   getMessageFileDown,
   addMessage
 };
