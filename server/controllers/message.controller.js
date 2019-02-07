@@ -275,6 +275,7 @@ let getMessage = (req, res) => {
     res.status(status).send(response);
   });
 }
+
 let searchMessage = (req, res) => {
   let {
     searchKey,
@@ -382,8 +383,30 @@ let getMessageFileDown = (req, res) => {
             });
             let resourceend = "</resources>";
             fs.appendFileSync(xmlFile, resourceend);
+            next(null);
+          } else if (format && format == "json") {
+            fs.writeFileSync(jsonFile, '');
+            let finalObj = {};
+            lodash.forEach(languages, (language) => {
+              let obj = {};
+              lodash.forEach(result, (message) => {
+                let msg = message.message;
+                if (msg[language]) obj[message.name] = msg[language];
+              });
+              if ((Object.keys(obj)).length) {
+                finalObj[language] = obj;
+                availableLang.push(language);
+              } else {
+                notAvailableLang.push(language);
+              }
+            });
+            fs.writeFileSync(jsonFile, JSON.stringify(finalObj), 'utf-8');
+            next(null);
           } else {
-            next(null, result);
+            next({
+              status: 400,
+              message: "Required format not available"
+            }, null);
           }
 
         } else {
@@ -393,31 +416,6 @@ let getMessageFileDown = (req, res) => {
           }, null);
         }
       });
-    }, (result, next) => {
-      if (format && format == "json") {
-        fs.writeFileSync(jsonFile, '');
-        let finalObj = {};
-        lodash.forEach(languages, (language) => {
-          let obj = {};
-          lodash.forEach(result, (message) => {
-            let msg = message.message;
-            if (msg[language]) obj[message.name] = msg[language];
-          });
-          if ((Object.keys(obj)).length) {
-            finalObj[language] = obj;
-            availableLang.push(language);
-          } else {
-            notAvailableLang.push(language);
-          }
-        });
-        fs.writeFileSync(jsonFile, JSON.stringify(finalObj), 'utf-8');
-        next(null);
-      } else {
-        next({
-          status: 400,
-          message: "Required format not available"
-        }, null);
-      }
     }, (next) => {
       if (availableLang.length == languages.length) {
         next(null, {

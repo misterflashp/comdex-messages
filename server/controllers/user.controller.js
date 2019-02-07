@@ -2,6 +2,7 @@ let async = require('async');
 let userDbo = require('../dbos/user.dbo');
 var jwt = require('../helpers/JWT');
 let bcryptHelper = require('../helpers/bcrypt.helper');
+let jwtDbo = require('../dbos/jwt.dbo');
 
 let login = (req, res) => {
   let {
@@ -140,7 +141,50 @@ let signUp = (req, res) => {
   });
 }
 
+let logout = (req, res) => {
+  let {
+    token
+  } = req.headers;
+  async.waterfall([
+    (next) => {
+      jwt.verifyJWT(token, (error, data) => {
+        if (error) next({
+          status: 400,
+          message: "Token expired"
+        }, null);
+        else {
+          next(null, data);
+        }
+      });
+    }, (data, next) => {
+      jwtDbo.deleteJwt({
+        token
+      }, (error, result) => {
+        if (error) {
+          next({
+            status: 500,
+            message: "Error while deleting jwt token"
+          }, null);
+        } else {
+          next(null, {
+            status: 200,
+            message: "Logged out successfully"
+          });
+        }
+      });
+    }
+  ], (error, result) => {
+    let response = Object.assign({
+      success: !error
+    }, error || result);
+    let status = response.status;
+    delete(response.status);
+    res.status(status).send(response);
+  });
+}
+
 module.exports = {
   login,
-  signUp
+  signUp,
+  logout
 };
