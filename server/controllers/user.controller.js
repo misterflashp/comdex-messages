@@ -142,6 +142,5 @@ let signUp = (req, res) => {
 
 module.exports = {
   login,
-  signUp,
-
+  signUp
 };
