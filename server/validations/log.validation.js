@@ -9,7 +9,7 @@ let getLogs = (req, res, next) => {
         appCode: joi.string().required(),
         language: joi.string()
     });
-    let { error } = joi.validate(req.query, getLogsSchema);
+    let {error} = joi.validate(req.query, getLogsSchema);
     if (error) res.status(422).send({
         success: false,
         error

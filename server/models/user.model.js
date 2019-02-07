@@ -22,8 +22,8 @@ let userSchema = new mongoose.Schema({
         required: true
     }
 }, {
-        versionKey: false,
-        strict: true
-    });
+    versionKey: false,
+    strict: true
+});
 
 module.exports = mongoose.model('user', userSchema);

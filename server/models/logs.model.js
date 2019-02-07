@@ -22,16 +22,16 @@ let logSchema = new mongoose.Schema({
         required: true
     },
     logType: {
-        type:String,
-        required:true
+        type: String,
+        required: true
     },
     updatedOn: {
         type: Date,
         required: true
     }
 }, {
-        versionKey: false,
-        strict: true
-    });
+    versionKey: false,
+    strict: true
+});
 
 module.exports = mongoose.model('log', logSchema);

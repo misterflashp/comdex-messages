@@ -7,15 +7,15 @@ let jwtSchema = new mongoose.Schema({
     },
     createdOn: {
         type: Date,
-        required:true
+        required: true
     },
     expiresOn: {
         type: Date,
         required: true
     }
 }, {
-        versionKey: false,
-        strict: true
-    });
+    versionKey: false,
+    strict: true
+});
 
 module.exports = mongoose.model('jwt', jwtSchema);

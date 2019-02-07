@@ -1,6 +1,6 @@
 let jwtModel = require('../models/jwt.model');
 
-let getJwt = (obj, cb) =>{
+let getJwt = (obj, cb) => {
     jwtModel.find(obj, {}, (error, result) => {
         if (error) cb(error, null);
         cb(null, result || null);
@@ -23,7 +23,7 @@ let addAdd = (obj, cb) => {
 }
 
 module.exports = {
-   getJwt,
-   addAdd,
-   deleteJwt
+    getJwt,
+    addAdd,
+    deleteJwt
 };

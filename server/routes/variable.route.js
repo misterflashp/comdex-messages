@@ -3,9 +3,9 @@ let variableValidation = require('../validations/variable.validation');
 
 module.exports = (server) => {
 
-  server.get('/variable', variableValidation.getVariable, variableController.getVariable);
+    server.get('/variable', variableValidation.getVariable, variableController.getVariable);
 
-  server.put('/variable', variableValidation.updateVariable, variableController.updateVariable);
+    server.put('/variable', variableValidation.updateVariable, variableController.updateVariable);
 
-  server.post('/variable', variableValidation.updateVariable, variableController.addVariable);
+    server.post('/variable', variableValidation.updateVariable, variableController.addVariable);
 };
