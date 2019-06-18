@@ -1,16 +1,16 @@
 let server = {
-  port: 3030
+    port: 3002
 };
 
 let mongoDb = {
-  address: '127.0.0.1',
-  port: 27017,
-  dbName: 'comdex-messages'
+    address: '127.0.0.1',
+    port: 27017,
+    dbName: 'comdexMessages'
 };
-let jwtSecret = "_";
+let jwtSecret = "!Q@W#E$R%T^Y&U*I(O)P_";
 
 module.exports = {
-  server,
-  mongoDb,
-  jwtSecret
+    server,
+    mongoDb,
+    jwtSecret
 };
