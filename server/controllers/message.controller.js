@@ -431,7 +431,7 @@ let getMessageFileDown = (req, res) => {
                 next({
                     status: 400,
                     format: format,
-                    message: 'No language translation available'
+                    message: 'No language transalation available'
                 });
             } else {
                 next(null, {
